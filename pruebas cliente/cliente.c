@@ -23,7 +23,7 @@ void createRandomProcesses(){
 
 void* sendInfo(void* data){
 	int *values = (int *)data;
-	int values3[3] = {values[0], values[1], values[2]};
+	int process[3] = {values[0], values[1], values[2]};
 	int sockfd = 0, n = 0;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
@@ -50,8 +50,8 @@ void* sendInfo(void* data){
 	    }
 
 
-		//Sends process' pid
-		n = write(sockfd, &values3, sizeof(values3));
+		//Sends process
+		n = write(sockfd, &process, sizeof(process));
 		if(n < 0){ printf("ERROR sending pId to socket\n"); }
 
 		//Sends process' burst time

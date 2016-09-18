@@ -1,16 +1,19 @@
 CC=gcc
 
-SOURCE= scheduler.c
-OUTPUT= scheduler
-OBJECT= scheduler.o
 LDFLAGS= -lpthread
 
-$(OUTPUT): $(OBJECT)
-	$(CC) $(OBJECT) -o $(OUTPUT) $(LDFLAGS)
+client: client.o
+	$(CC) client.o -o client $(LDFLAGS)
+server: server.o
+	$(CC) server.o -o server $(LDFLAGS)
 
-$(OBJECT): $(SOURCE)
-	$(CC) -c $(SOURCE) -o scheduler.o $(LDFLAGS)
+client.o: client.c
+	$(CC) -c client.c -o client.o $(LDFLAGS)
+server.o: server.c
+	$(CC) -c server.c -o server.o $(LDFLAGS)
 
 clean:
 	rm -f *.o
-	rm -f scheduler
+	rm -f client
+	rm -f server
+	
