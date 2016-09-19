@@ -12,7 +12,7 @@
 static int pid = 0;
 static int burst, priority, wait;
 static pthread_t client, simulator;
-static pthread_t threads[1000];
+static pthread_t threads[100000];
 static time_t t;
 
 void *sendInfo(void* data){
@@ -21,7 +21,7 @@ void *sendInfo(void* data){
     int sockfd = 0, n = 0;
     struct sockaddr_in serv_addr;
     struct hostent *server;
-    printf("Sending process...\n");
+    printf("Sending process: %i, with burst: %i, and priority: %i\n", values[0],values[1],values[2]);
     int counter = 0;
 
     while(counter < 1){
@@ -60,7 +60,7 @@ void *createRandomProcesses(void* data){
 
     while (1) {
         burst = rand() % 20;
-        priority = rand() % 5;
+        priority = (rand() % 5) + 1;
         
         int values[3] = {pid, burst, priority};
                         
@@ -102,9 +102,9 @@ int main() {
 	printf("\nTecnológico de Costa Rica\n");
 	printf("\tOperative Systems' Principles\n\n");
 	printf("Teacher: \t Erika Marín Schumann\n");
-	printf("Students: \t Carlos Girón Alas \t2014113159\n");
+	printf("Students: \t Carlos M. Girón Alas \t2014113159\n");
 	printf("\t\t Julián J. Méndez O. \t2014121700\n");
-	printf("\t\t Jasson Moya Álvarez \t2014082335\n");
+	printf("\t\t Jasson J. Moya Álvarez \t2014082335\n");
 
 	printf("\n\n\nCPU Scheduler Simulator 2000 CLIENT\n\n");
     

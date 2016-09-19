@@ -10,12 +10,20 @@
 #include <pthread.h>
 #include <termios.h>
 #include <fcntl.h>
+#include <time.h>
+#include <math.h>
 
 struct Process{
     int pid;
     int burst;
     int priority;
+
+    int burstleft;
     int isEmpty;
+    
+    clock_t start;
+    double tat;
+    double wt;
 };
 
 static struct Process* processes;
@@ -28,7 +36,8 @@ void printQueue() {
     for(int i = 0; i < memorysize; ++i)
     {
         if(processes[i].isEmpty == 0)
-            printf("Index: %i || ID: %i || Burst: %i || Priority: %i\n", i, processes[i].pid, processes[i].burst, processes[i].priority);
+            printf("Index: %i || ID: %i || Burst: %i || Priority: %i || Current TAT: %f \n", 
+                i, processes[i].pid, processes[i].burst, processes[i].priority, ((double)clock() - processes[i].start)/CLOCKS_PER_SEC );
     }
     printf("-------------------------------------------------------------------------------\n\n");
 }
@@ -39,7 +48,12 @@ void initQueue(){
         processes[i].pid = -1;
         processes[i].burst = -1;
         processes[i].priority = -1;
+
+        processes[i].burstleft = -1;
         processes[i].isEmpty = 1;
+
+        processes[i].tat = -1;
+        processes[i].wt = -1;
     }
 }
 
@@ -186,24 +200,33 @@ int getMinimunRR() {
     return -1;
 }
 
-
 void run(int pIndex) {
     printf("Running process %i with a burst of %i and priority of %i\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority);
     sleep(processes[pIndex].burst);
+    
+    processes[pIndex].tat = ((double)clock() - processes[pIndex].start)/CLOCKS_PER_SEC;
+    processes[pIndex].wt = processes[pIndex].tat - processes[pIndex].burst;
+
+    //Escribir en .txt el proceso terminado
     processes[pIndex].isEmpty = 1;
 }
 
 void runRR(int pIndex, int pQuantum) {
-    printf("Running process %i with a burst of %i and priority of %i while %i\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority, pQuantum);
-    if(pQuantum < processes[pIndex].burst) 
+    printf("Running process %i with a remaining burst of %i (originally %i) and priority of %i for %i\n", processes[pIndex].pid, processes[pIndex].burstleft, processes[pIndex].burst, processes[pIndex].priority, pQuantum);
+    if(pQuantum < processes[pIndex].burstleft) 
     {
         sleep(pQuantum);
-        processes[pIndex].burst -= pQuantum;
+        processes[pIndex].burstleft -= pQuantum;
     }
     else
     {
-        sleep(processes[pIndex].burst);
-        processes[pIndex].burst = 0;
+        sleep(processes[pIndex].burstleft);
+        processes[pIndex].burstleft = 0;
+
+        processes[pIndex].tat = ((double)clock() - processes[pIndex].start)/CLOCKS_PER_SEC;
+        processes[pIndex].wt = processes[pIndex].tat - processes[pIndex].burst;
+
+        //Escribir en .txt el proceso terminado
         processes[pIndex].isEmpty = 1;
     }
 }
@@ -347,6 +370,7 @@ void *jobsch (void* pf){
                 processes[i].burst = number[1];
                 processes[i].priority = number[2];
                 processes[i].isEmpty = 0;
+                processes[i].start = clock();
                 flag = 1;
                 break;
             }
@@ -491,6 +515,8 @@ int main(int argc, char *argv[]) {
             }
             else if (p == 27) { //ESC = 27
                 pthread_cancel(server_thread);
+                pthread_cancel(cpu_sch_thread);
+                
                 printf("\n\t These are the resulting stats:\n");
                 printf("\t\t Insert stats instead of this print.\n");
 

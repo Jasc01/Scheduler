@@ -1,6 +1,6 @@
 CC=gcc
 
-LDFLAGS= -lpthread
+LDFLAGS= -lpthread -lm
 
 client: client.o
 	$(CC) client.o -o client $(LDFLAGS)
