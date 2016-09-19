@@ -8,11 +8,263 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
-
-
 #include <termios.h>
-#include <unistd.h>
 #include <fcntl.h>
+
+struct Process{
+    int pid;
+    int burst;
+    int priority;
+    int isEmpty;
+};
+
+static struct Process* processes;
+static int lowestProcessIdForRR = 0;
+static int algoritmo, quantum;
+static int memorysize = 5;
+
+void printQueue() {
+    printf("-------------------------------------------------------------------------------\n");
+    for(int i = 0; i < memorysize; ++i)
+    {
+        if(processes[i].isEmpty == 0)
+            printf("Index: %i || ID: %i || Burst: %i || Priority: %i\n", i, processes[i].pid, processes[i].burst, processes[i].priority);
+    }
+    printf("-------------------------------------------------------------------------------\n\n");
+}
+
+void initQueue(){
+    processes = malloc(sizeof(struct Process)*memorysize);
+    for (int i = 0; i < memorysize; ++i) {
+        processes[i].pid = -1;
+        processes[i].burst = -1;
+        processes[i].priority = -1;
+        processes[i].isEmpty = 1;
+    }
+}
+
+int checkAllProcessesDead(){
+    int allDead = 1;
+    for (int i = 0; i < memorysize; ++i)
+    {
+        if(processes[i].isEmpty == 0) {
+            allDead = 0;
+        }
+    }
+
+    return allDead;
+}
+
+int changeRound(){
+    int maxValue = processes[0].pid;
+    int maxValueLocation = 0;
+
+    for (int i = 0; i < memorysize; ++i)
+    {
+        if (processes[i].pid > maxValue)
+        {
+            maxValue = processes[i].pid;
+            maxValueLocation = i;
+        }
+    }
+
+    if(lowestProcessIdForRR == maxValue)
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+int getMinimunFiFo() {
+    int minimum = processes[0].pid;
+    int minumumLocation = 0;
+    for(int i = 0; i < memorysize; ++i) {
+        if(processes[i].isEmpty == 0) {
+            minimum = processes[i].pid;
+            minumumLocation = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i < memorysize; ++i) 
+    {
+        if (processes[i].pid < minimum && processes[i].isEmpty == 0) 
+        {
+           minimum = processes[i].pid;
+           minumumLocation = i;
+        }
+    }
+    if(checkAllProcessesDead() == 0) {
+        return minumumLocation;
+    }
+    return -1;
+}
+
+int getMinimunSJF() {
+    int minimum = processes[0].burst;
+    int minumumLocation = 0;
+    for(int i = 0; i < memorysize; ++i) {
+        if(processes[i].isEmpty == 0) {
+            minimum = processes[i].burst;
+            minumumLocation = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i < memorysize; ++i) {
+        if (processes[i].burst < minimum && processes[i].isEmpty == 0) 
+        {
+           minimum = processes[i].burst;
+           minumumLocation = i;
+        }
+        else if(processes[i].burst == minimum && processes[i].isEmpty == 0) 
+        {
+            minimum = processes[i].pid < processes[minumumLocation].pid ? minimum = processes[i].burst : processes[minumumLocation].burst;
+            minumumLocation = processes[i].pid < processes[minumumLocation].pid ? minimum = i : minumumLocation;
+        }
+    }
+    if(checkAllProcessesDead() == 0) {
+        return minumumLocation;
+    }
+    return -1;
+}
+
+int getMinimunHPF() {
+    int minimum = processes[0].priority;
+    int minumumLocation = 0;
+    for(int i = 0; i < memorysize; ++i) {
+        if(processes[i].isEmpty == 0) {
+            minimum = processes[i].priority;
+            minumumLocation = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i < memorysize; ++i) 
+    {
+        if (processes[i].priority < minimum && processes[i].isEmpty == 0) 
+        {
+           minimum = processes[i].priority;
+           minumumLocation = i;
+        }
+        else if(processes[i].priority == minimum && processes[i].isEmpty == 0) 
+        {
+            minimum = processes[i].pid < processes[minumumLocation].pid ? minimum = processes[i].priority : processes[minumumLocation].priority;
+            minumumLocation = processes[i].pid < processes[minumumLocation].pid ? minimum = i : minumumLocation;
+        }
+    }
+    if(checkAllProcessesDead() == 0) {
+        return minumumLocation;
+    }
+    return -1;
+}
+
+int getMinimunRR() {
+    int minimum = processes[0].pid;
+    int minumumLocation = 0;
+    for(int i = 0; i < memorysize; ++i) {
+        if(processes[i].isEmpty == 0 && processes[i].pid > lowestProcessIdForRR) {
+            minimum = processes[i].pid;
+            minumumLocation = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i < memorysize; ++i) 
+    {
+        if (processes[i].pid < minimum && processes[i].isEmpty == 0 && processes[i].pid > lowestProcessIdForRR) 
+        {
+           minimum = processes[i].pid;
+           minumumLocation = i;
+        }
+    }
+    lowestProcessIdForRR = minimum;
+    if(checkAllProcessesDead() == 0) {
+        return minumumLocation;
+    }
+    return -1;
+}
+
+
+void run(int pIndex) {
+    printf("Running process %i with a burst of %i and priority of %i\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority);
+    sleep(processes[pIndex].burst);
+    processes[pIndex].isEmpty = 1;
+}
+
+void runRR(int pIndex, int pQuantum) {
+    printf("Running process %i with a burst of %i and priority of %i while %i\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority, pQuantum);
+    if(pQuantum < processes[pIndex].burst) 
+    {
+        sleep(pQuantum);
+        processes[pIndex].burst -= pQuantum;
+    }
+    else
+    {
+        sleep(processes[pIndex].burst);
+        processes[pIndex].burst = 0;
+        processes[pIndex].isEmpty = 1;
+    }
+}
+
+void fifo(){
+    int n = 0;
+    for (int i = 0; i < memorysize; ++i)
+    {
+        int first = getMinimunFiFo();
+        if(first != -1) {
+            n++;
+            run(first);
+        }
+    }
+    if(n == 0) {
+        printf("Nothing to run... Yet\n");
+    }
+}
+
+void sjf(){
+    int n = 0;
+    for (int i = 0; i < memorysize; ++i)
+    {
+        int first = getMinimunSJF();
+        if(first != -1) {
+            n++;
+            run(first);
+        }
+    }
+    if(n == 0) {
+        printf("Nothing to run... Yet\n");
+    }
+}
+
+void hpf(){
+    int n = 0;
+    for (int i = 0; i < memorysize; ++i)
+    {
+        int first = getMinimunHPF();
+        if(first != -1) {
+            n++;
+            run(first);
+        }
+    }
+    if(n == 0) {
+        printf("Nothing to run... Yet\n");
+    }
+}
+
+void rr(){
+    while(checkAllProcessesDead() == 0) 
+    {
+        int first = getMinimunRR();
+        runRR(first, quantum);
+        if(changeRound() == 1)
+        {
+            lowestProcessIdForRR = 0;
+        }
+    }
+    printf("Nothing to run... Yet\n");
+}
 
 void error(const char *msg) {
     perror(msg);
@@ -44,13 +296,13 @@ int kbhit(void) {
     return 0;
 }
 
-void *server (void* pf){
+void *jobsch (void* pf){
     int sockfd, newsockfd, portno;
     socklen_t clilen;
     char buffer[256];
     int number[3];
     struct sockaddr_in serv_addr, cli_addr;
-    int n;
+    int n, flag;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     
@@ -84,9 +336,27 @@ void *server (void* pf){
 
         if (n < 0) error("ERROR reading from socket");
         
-        printf("Process received.\n\t PID: %i, ",number[0]);
-        printf("burst: %i, ",number[1]);
-        printf("priority: %i\n",number[2]);
+        //printf("Process received.\n\t PID: %i, ",number[0]);
+        //printf("burst: %i, ",number[1]);
+        //printf("priority: %i\n",number[2]);
+
+        flag = 0;
+        for (int i = 0; i < memorysize; ++i){
+            if (processes[i].isEmpty == 1) {
+                processes[i].pid = number[0];
+                processes[i].burst = number[1];
+                processes[i].priority = number[2];
+                processes[i].isEmpty = 0;
+                flag = 1;
+                break;
+            }
+        }
+
+        if (!flag) {
+            printf("Ready queue full.\n");
+        }
+
+
 
         if (n < 0) error("ERROR writing to socket");
         
@@ -95,13 +365,45 @@ void *server (void* pf){
     close(sockfd);
 }
 
+void *cpusch (void* pf){
+    switch (algoritmo) {
+        case 1: 
+            while(1) {
+                fifo();
+                sleep(1);
+            }
+            break;
+        case 2: 
+            while(1) {
+                sjf();
+                sleep(1);
+            }
+            break;
+        case 3: 
+            while(1) {
+                hpf();
+                sleep(1);
+            }
+            break;
+        case 4:
+            while(1) {
+                rr();
+                sleep(1);
+            }
+            break;
+        default: 
+            error("KERNEL PANIC LOLJK");
+            break;
+    }
+}
+
 int main(int argc, char *argv[]) { 
     //Input del usuario.
     char dump[100], p;
-    int algoritmo, quantum;
     pthread_t server_thread;
-   
+    pthread_t cpu_sch_thread;
     
+    initQueue();
     printf("\nTecnológico de Costa Rica\n");
     printf("\tOperative Systems' Principles\n\n");
     printf("Teacher: \t Erika Marín Schumann\n");
@@ -152,8 +454,6 @@ int main(int argc, char *argv[]) {
                                 else {
                                     if ((int) strtol(dump, (char **)NULL, 10)) {
                                         quantum = (int) strtol(dump, (char **)NULL, 10);
-
-                                        //Llamar al round robin
                                         break;
                                     }
                                 
@@ -162,6 +462,7 @@ int main(int argc, char *argv[]) {
                                     }
                                 }
                             }
+                            break;
 
                         case 5:
                             printf("\n\nProgram finished.\n\n");
@@ -169,7 +470,7 @@ int main(int argc, char *argv[]) {
                         default:
                             break;
                     }
-                    printf("%i\n", algoritmo);  
+                    //printf("%i\n", algoritmo);  
                     break;
                 }
             }
@@ -177,13 +478,16 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    pthread_create(&server_thread, NULL, server, NULL);    
+    pthread_create(&server_thread, NULL, jobsch, NULL);    
+    pthread_create(&cpu_sch_thread, NULL, cpusch, NULL);    
+        
+
     while(1) {
         if (kbhit()) {
             p = getchar();
             if (p == 'd' || p == 'D') { //for Display
                 printf("\n\t This is the current queue:\n");
-                printf("\t\t Insert functional queue instead of this print.\n");
+                printQueue();
             }
             else if (p == 27) { //ESC = 27
                 pthread_cancel(server_thread);
