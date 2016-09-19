@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <math.h>
+#include <netdb.h>
 
 struct Process{
     int pid;
@@ -200,8 +201,43 @@ int getMinimunRR() {
     return -1;
 }
 
+void sendResult(int pIndex) {
+    int values[3] = {processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority};
+    int sockfd = 0, n = 0;
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        printf("ERROR creating socket.\n"); 
+    }
+
+    server = gethostbyname("localhost");
+    if (server == NULL) {
+        printf("ERROR, no such host.\n");
+        exit(0);
+    }
+
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+         (char *)&serv_addr.sin_addr.s_addr,
+         server->h_length);
+    serv_addr.sin_port = htons(9080);
+    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0){
+        printf("ERROR connecting.\n");
+    }
+
+    //Sends result
+    n = write(sockfd, &values, sizeof(values));
+    if(n < 0){ printf("ERROR sending PID to socket.\n"); }
+
+    close(sockfd);  //Closes socket
+}
+
 void run(int pIndex) {
     printf("Running process %i with a burst of %i and priority of %i\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority);
+    sendResult(pIndex);
     sleep(processes[pIndex].burst);
     
     processes[pIndex].tat = ((double)clock() - processes[pIndex].start)/CLOCKS_PER_SEC;
@@ -213,6 +249,7 @@ void run(int pIndex) {
 
 void runRR(int pIndex, int pQuantum) {
     printf("Running process %i with a remaining burst of %i (originally %i) and priority of %i for %i\n", processes[pIndex].pid, processes[pIndex].burstleft, processes[pIndex].burst, processes[pIndex].priority, pQuantum);
+    sendResult(pIndex);
     if(pQuantum < processes[pIndex].burstleft) 
     {
         sleep(pQuantum);
