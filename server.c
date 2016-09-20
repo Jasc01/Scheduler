@@ -31,6 +31,18 @@ static struct Process* processes;
 static int lowestProcessIdForRR = 0;
 static int algoritmo, quantum;
 static int memorysize = 5;
+static double *results;
+static FILE *f;
+static int globpid, globburst, globpiority;
+static double globtat, globwt;
+static clock_t lazyClock;
+static double lazySUM;
+
+
+void error(const char *msg) {
+    perror(msg);
+    exit(1);
+}
 
 void printQueue() {
     printf("-------------------------------------------------------------------------------\n");
@@ -43,7 +55,12 @@ void printQueue() {
     printf("-------------------------------------------------------------------------------\n\n");
 }
 
-void initQueue(){
+void bootstrap(){
+    f = fopen("results.txt", "w");
+    if (f == NULL) {
+        error("ERROR opening results file!\n");
+    }
+
     processes = malloc(sizeof(struct Process)*memorysize);
     for (int i = 0; i < memorysize; ++i) {
         processes[i].pid = -1;
@@ -56,6 +73,7 @@ void initQueue(){
         processes[i].tat = -1;
         processes[i].wt = -1;
     }
+    lazyClock = clock();
 }
 
 int checkAllProcessesDead(){
@@ -236,20 +254,23 @@ void sendResult(int pIndex) {
 }
 
 void run(int pIndex) {
+    lazySUM += ((double)clock() - lazyClock)/CLOCKS_PER_SEC;
     printf("Running process %i with a burst of %i and priority of %i\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority);
-    sendResult(pIndex);
     sleep(processes[pIndex].burst);
+    sendResult(pIndex);
     
     processes[pIndex].tat = ((double)clock() - processes[pIndex].start)/CLOCKS_PER_SEC;
     processes[pIndex].wt = processes[pIndex].tat - processes[pIndex].burst;
 
     //Escribir en .txt el proceso terminado
+    fprintf(f, "%i,%i,%i,%f,%f\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority,processes[pIndex].tat,processes[pIndex].wt);
     processes[pIndex].isEmpty = 1;
+    lazyClock = clock();
 }
 
 void runRR(int pIndex, int pQuantum) {
+    lazySUM += ((double)clock() - lazyClock)/CLOCKS_PER_SEC;
     printf("Running process %i with a remaining burst of %i (originally %i) and priority of %i for %i\n", processes[pIndex].pid, processes[pIndex].burstleft, processes[pIndex].burst, processes[pIndex].priority, pQuantum);
-    sendResult(pIndex);
     if(pQuantum < processes[pIndex].burstleft) 
     {
         sleep(pQuantum);
@@ -258,14 +279,17 @@ void runRR(int pIndex, int pQuantum) {
     else
     {
         sleep(processes[pIndex].burstleft);
+        sendResult(pIndex);
         processes[pIndex].burstleft = 0;
 
         processes[pIndex].tat = ((double)clock() - processes[pIndex].start)/CLOCKS_PER_SEC;
         processes[pIndex].wt = processes[pIndex].tat - processes[pIndex].burst;
 
         //Escribir en .txt el proceso terminado
+        fprintf(f, "%i,%i,%i,%f,%f\n", processes[pIndex].pid, processes[pIndex].burst, processes[pIndex].priority,processes[pIndex].tat,processes[pIndex].wt);
         processes[pIndex].isEmpty = 1;
     }
+    lazyClock = clock();
 }
 
 void fifo(){
@@ -324,11 +348,6 @@ void rr(){
         }
     }
     printf("Nothing to run... Yet\n");
-}
-
-void error(const char *msg) {
-    perror(msg);
-    exit(1);
 }
 
 int kbhit(void) {
@@ -406,6 +425,8 @@ void *jobsch (void* pf){
                 processes[i].pid = number[0];
                 processes[i].burst = number[1];
                 processes[i].priority = number[2];
+
+                processes[i].burstleft = number[1];
                 processes[i].isEmpty = 0;
                 processes[i].start = clock();
                 flag = 1;
@@ -427,6 +448,7 @@ void *jobsch (void* pf){
 }
 
 void *cpusch (void* pf){
+
     switch (algoritmo) {
         case 1: 
             while(1) {
@@ -458,13 +480,36 @@ void *cpusch (void* pf){
     }
 }
 
+void readResults(){
+    FILE* file;
+    int processesFinished = 0;
+    double avgTAT = 0;
+    double avgWT = 0;
+    double lazyBastard = 0;
+    if (file = fopen("results.txt", "r")) {
+        printf("Results:\n");
+        printf("PID\tBurst\tPriority\tTAT\tWT\n");
+        while(fscanf(file, "%i,%i,%i,%lf,%lf",&globpid,&globburst,&globpiority,&globtat,&globwt) == 5){
+            processesFinished++;
+            avgTAT += globtat;
+            avgWT += globwt;
+            printf("%i\t%i\t%i\t\t%lf\t%lf\n", globpid, globburst, globpiority, globtat, globwt);
+        }
+        fclose(file);
+        printf("Processes ran: %i\n", processesFinished);
+        printf("Avg TAT: %lf\nAvg WT: %lf\n", (avgTAT/processesFinished), (avgWT/processesFinished));
+        printf("Idle CPU: %lf\n", lazySUM);
+    }else{ 
+        printf("ERROR opening results file.\n");
+    }
+}
 int main(int argc, char *argv[]) { 
     //Input del usuario.
     char dump[100], p;
     pthread_t server_thread;
     pthread_t cpu_sch_thread;
     
-    initQueue();
+    bootstrap();
     printf("\nTecnológico de Costa Rica\n");
     printf("\tOperative Systems' Principles\n\n");
     printf("Teacher: \t Erika Marín Schumann\n");
@@ -558,6 +603,7 @@ int main(int argc, char *argv[]) {
                 printf("\t\t Insert stats instead of this print.\n");
 
                 printf("Program finished.");
+                fclose(f);
                 break;
             }
             else {
@@ -565,6 +611,8 @@ int main(int argc, char *argv[]) {
             }
         } 
     } 
+    readResults();
+
     return 0; 
 }
 

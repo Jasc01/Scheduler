@@ -59,7 +59,7 @@ void *createRandomProcesses(void* data){
     srand((unsigned) time(&t));
 
     while (1) {
-        burst = rand() % 20;
+        burst = (rand() % 20) + 1;
         priority = (rand() % 5) + 1;
         
         int values[3] = {pid, burst, priority};
@@ -89,7 +89,7 @@ void *readProcesses(void* data){
         }
         fclose(file);
     }else{ 
-        printf("Error, no se pudo leer el archivo con procesos.\n");
+        printf("ERROR opening processes file.\n");
     }
 }
 

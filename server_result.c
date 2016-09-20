@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
         //printf("burst: %i, ",number[1]);
         //printf("priority: %i\n",number[2]);
 
-        printf("Running process %i with a burst of %i and priority of %i\n", number[0], number[1], number[2]);
+        printf("Finished process %i with a burst of %i and priority of %i\n", number[0], number[1], number[2]);
 
 
 
