@@ -435,7 +435,7 @@ void *jobsch (void* pf){
         }
 
         if (!flag) {
-            printf("Ready queue full.\n");
+            printf("Ready queue full. Discarded process PID: %i, burst: %i, priority: %i. \n",number[0],number[1],number[2]);
         }
 
 
