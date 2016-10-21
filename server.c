@@ -101,7 +101,7 @@ int changeRound(){
         }
     }
 
-    if(lowestProcessIdForRR == maxValue)
+    if(lowestProcessIdForRR == maxValue+1)
     {
         return 1;
     }
